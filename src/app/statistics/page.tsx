@@ -24,12 +24,22 @@ export default function StatisticsPage() {
 
   const stats = useMemo(() => calculateStatistics(draws), [draws]);
 
+  // Sort by number for chart (create new array to avoid mutating)
+  const sortedByNumber = useMemo(
+    () => [...stats.numberFrequency].sort((a, b) => a.number - b.number),
+    [stats.numberFrequency]
+  );
+
+  // Top/Bottom by frequency (stats.numberFrequency is already sorted by frequency desc)
+  const topNumbers = useMemo(() => stats.numberFrequency.slice(0, 10), [stats.numberFrequency]);
+  const bottomNumbers = useMemo(() => stats.numberFrequency.slice(-10).reverse(), [stats.numberFrequency]);
+
   const frequencyChartData = {
     labels: Array.from({ length: TOTAL_NUMBERS }, (_, i) => (i + 1).toString()),
     datasets: [
       {
         label: '출현 횟수',
-        data: stats.numberFrequency.sort((a, b) => a.number - b.number).map((n) => n.frequency),
+        data: sortedByNumber.map((n) => n.frequency),
         backgroundColor: Array.from({ length: TOTAL_NUMBERS }, (_, i) => {
           const num = i + 1;
           if (num <= 10) return '#fbbf24';
@@ -51,9 +61,6 @@ export default function StatisticsPage() {
       },
     ],
   };
-
-  const topNumbers = stats.numberFrequency.slice(0, 10);
-  const bottomNumbers = stats.numberFrequency.slice(-10).reverse();
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
