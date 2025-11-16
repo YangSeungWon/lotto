@@ -1,0 +1,51 @@
+name: Update Lottery Data
+
+on:
+  schedule:
+    # Run every Sunday at 00:00 UTC (09:00 KST) after Saturday draw
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Fetch latest lottery data
+        run: node scripts/fetch-lottery-data.js
+
+      - name: Check for changes
+        id: git-check
+        run: |
+          git diff --exit-code public/data/lottery-history.json || echo "changed=true" >> $GITHUB_OUTPUT
+
+      - name: Commit and push if changed
+        if: steps.git-check.outputs.changed == 'true'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add public/data/lottery-history.json
+          git commit -m "chore: update lottery data $(date +'%Y-%m-%d')"
+          git push
+
+      - name: Update sitemap
+        if: steps.git-check.outputs.changed == 'true'
+        run: |
+          node scripts/generate-sitemap.js
+          git add public/sitemap.xml
+          git commit -m "chore: update sitemap $(date +'%Y-%m-%d')" || true
+          git push || true
