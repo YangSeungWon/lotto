@@ -29,37 +29,47 @@ export default function GeneratorPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-4">무작위 번호 생성기</h1>
-        <p className="text-gray-600">
-          암호학적으로 안전한 무작위 번호를 생성합니다. 이 번호는 다른 어떤 조합과도 동일한 당첨 확률을 가집니다.
+    <div className="max-w-4xl mx-auto px-4 py-12">
+      <div className="text-center mb-10 animate-fade-in">
+        <div className="text-5xl mb-4">🎲</div>
+        <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-pink-500 bg-clip-text text-transparent mb-4">
+          무작위 번호 생성기
+        </h1>
+        <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+          암호학적으로 안전한 무작위 번호를 생성합니다.
+          <br />
+          <span className="text-purple-600 font-medium">
+            이 번호는 다른 어떤 조합과도 동일한 당첨 확률을 가집니다.
+          </span>
         </p>
       </div>
 
       <Disclaimer type="warning" />
 
       {/* Generator */}
-      <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
+      <div className="card-elevated rounded-2xl p-10 mb-8">
         <div className="text-center">
           <button
             onClick={handleGenerate}
-            className="bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold py-4 px-8 rounded-full text-xl hover:opacity-90 transition transform hover:scale-105 mb-8"
+            className="btn-primary text-white font-bold py-5 px-12 rounded-full text-xl shadow-xl mb-10"
           >
             🎲 번호 생성하기
           </button>
 
           {numbers.length > 0 && (
             <div className="animate-fade-in">
-              <div className="flex flex-wrap justify-center gap-4 mb-6">
+              <div className="flex flex-wrap justify-center gap-4 mb-6 ball-container">
                 {numbers.map((num, idx) => (
-                  <LottoBall key={idx} number={num} size="lg" />
+                  <LottoBall key={idx} number={num} size="lg" animate />
                 ))}
               </div>
-              <p className="text-sm text-gray-500">
-                이 조합의 당첨 확률: <span className="font-bold">1 in {TOTAL_COMBINATIONS.toLocaleString()}</span>
+              <p className="text-base text-gray-600">
+                이 조합의 당첨 확률:{' '}
+                <span className="font-bold text-red-500">1 in {TOTAL_COMBINATIONS.toLocaleString()}</span>
               </p>
-              <p className="text-xs text-gray-400 mt-1">(다른 모든 조합과 동일한 확률)</p>
+              <p className="text-sm text-amber-600 mt-2 font-medium">
+                ⚠️ 다른 모든 조합과 동일한 확률입니다
+              </p>
             </div>
           )}
         </div>
