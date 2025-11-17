@@ -1,13 +1,12 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import LottoBall from '@/components/LottoBall';
 import Disclaimer from '@/components/Disclaimer';
 import {
   generateRandomNumbers,
   TOTAL_COMBINATIONS,
   checkHistoricalPerformance,
-  HistoricalMatchResult,
 } from '@/lib/lottery-utils';
 import { LotteryDraw } from '@/lib/types';
 import lotteryData from '../../../public/data/lottery-history.json';
@@ -15,6 +14,10 @@ import lotteryData from '../../../public/data/lottery-history.json';
 export default function GeneratorPage() {
   const [numbers, setNumbers] = useState<number[]>([]);
   const [history, setHistory] = useState<number[][]>([]);
+  const [autoMode, setAutoMode] = useState<'none' | '1st' | '2nd'>('none');
+  const [attemptCount, setAttemptCount] = useState(0);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const autoModeRef = useRef<'none' | '1st' | '2nd'>('none');
   const draws = lotteryData as LotteryDraw[];
 
   const historicalPerformance = useMemo(() => {
@@ -26,7 +29,77 @@ export default function GeneratorPage() {
     const newNumbers = generateRandomNumbers();
     setNumbers(newNumbers);
     setHistory((prev) => [newNumbers, ...prev.slice(0, 9)]);
+    if (autoMode !== 'none') {
+      setAttemptCount((prev) => prev + 1);
+    }
   };
+
+  const stopAutoGenerate = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    setAutoMode('none');
+    autoModeRef.current = 'none';
+  }, []);
+
+  const startAutoGenerate = useCallback((target: '1st' | '2nd') => {
+    setAutoMode(target);
+    autoModeRef.current = target;
+    setAttemptCount(0);
+
+    // Generate first number immediately
+    const newNumbers = generateRandomNumbers();
+    setNumbers(newNumbers);
+    setHistory((prev) => [newNumbers, ...prev.slice(0, 9)]);
+    setAttemptCount(1);
+
+    // Check first result
+    const firstPerf = checkHistoricalPerformance(newNumbers, draws);
+    if (target === '1st' && firstPerf.firstPlace > 0) {
+      return;
+    }
+    if (target === '2nd' && (firstPerf.firstPlace > 0 || firstPerf.secondPlace > 0)) {
+      return;
+    }
+
+    // Start interval
+    intervalRef.current = setInterval(() => {
+      const nums = generateRandomNumbers();
+      setNumbers(nums);
+      setHistory((prev) => [nums, ...prev.slice(0, 9)]);
+      setAttemptCount((prev) => prev + 1);
+
+      // Check if target reached
+      const perf = checkHistoricalPerformance(nums, draws);
+      const currentMode = autoModeRef.current;
+
+      if (currentMode === '1st' && perf.firstPlace > 0) {
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
+        setAutoMode('none');
+        autoModeRef.current = 'none';
+      } else if (currentMode === '2nd' && (perf.firstPlace > 0 || perf.secondPlace > 0)) {
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
+        setAutoMode('none');
+        autoModeRef.current = 'none';
+      }
+    }, 100); // 0.1초마다 (빠른 시뮬레이션)
+  }, [draws]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-12">
@@ -51,16 +124,61 @@ export default function GeneratorPage() {
         <div className="text-center">
           <button
             onClick={handleGenerate}
-            className="btn-primary text-white font-bold py-5 px-12 rounded-full text-xl shadow-xl mb-10"
+            disabled={autoMode !== 'none'}
+            className="btn-primary text-white font-bold py-5 px-12 rounded-full text-xl shadow-xl mb-6 disabled:opacity-50"
           >
             🎲 번호 생성하기
           </button>
+
+          {/* Auto Generate Buttons */}
+          <div className="flex flex-wrap justify-center gap-3 mb-10">
+            {autoMode === 'none' ? (
+              <>
+                <button
+                  onClick={() => startAutoGenerate('1st')}
+                  className="bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-white font-semibold py-3 px-6 rounded-full shadow-lg transition-all"
+                >
+                  🏆 1등 나올 때까지 반복
+                </button>
+                <button
+                  onClick={() => startAutoGenerate('2nd')}
+                  className="bg-gradient-to-r from-gray-400 to-gray-500 hover:from-gray-500 hover:to-gray-600 text-white font-semibold py-3 px-6 rounded-full shadow-lg transition-all"
+                >
+                  🥈 2등 나올 때까지 반복
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={stopAutoGenerate}
+                className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-semibold py-3 px-8 rounded-full shadow-lg transition-all animate-pulse"
+              >
+                ⏹️ 중지
+              </button>
+            )}
+          </div>
+
+          {/* Attempt Counter */}
+          {attemptCount > 0 && (
+            <div className="bg-indigo-50 rounded-lg p-4 mb-6">
+              <div className="text-3xl font-bold text-indigo-600 mb-1">
+                {attemptCount.toLocaleString()}회
+              </div>
+              <div className="text-sm text-indigo-500">
+                {autoMode !== 'none' ? '시도 중...' : '총 시도 횟수'}
+              </div>
+              {autoMode === 'none' && attemptCount > 0 && (
+                <div className="text-xs text-gray-500 mt-2">
+                  투자금: {(attemptCount * 1000).toLocaleString()}원
+                </div>
+              )}
+            </div>
+          )}
 
           {numbers.length > 0 && (
             <div className="animate-fade-in">
               <div className="flex flex-wrap justify-center gap-4 mb-6 ball-container">
                 {numbers.map((num, idx) => (
-                  <LottoBall key={idx} number={num} size="lg" animate />
+                  <LottoBall key={idx} number={num} size="lg" animate={autoMode === 'none'} />
                 ))}
               </div>
               <p className="text-base text-gray-600">
