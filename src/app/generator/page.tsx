@@ -11,13 +11,21 @@ import {
 import { LotteryDraw } from '@/lib/types';
 import lotteryData from '../../../public/data/lottery-history.json';
 
+const SPEED_LEVELS = {
+  1: { interval: 100, label: '느림', emoji: '🐢' },
+  2: { interval: 30, label: '보통', emoji: '🐇' },
+  3: { interval: 10, label: '빠름', emoji: '🚀' },
+};
+
 export default function GeneratorPage() {
   const [numbers, setNumbers] = useState<number[]>([]);
   const [history, setHistory] = useState<number[][]>([]);
   const [autoMode, setAutoMode] = useState<'none' | '1st' | '2nd'>('none');
   const [attemptCount, setAttemptCount] = useState(0);
+  const [speedLevel, setSpeedLevel] = useState<1 | 2 | 3>(1);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const autoModeRef = useRef<'none' | '1st' | '2nd'>('none');
+  const speedLevelRef = useRef<1 | 2 | 3>(1);
   const draws = lotteryData as LotteryDraw[];
 
   const historicalPerformance = useMemo(() => {
@@ -63,7 +71,8 @@ export default function GeneratorPage() {
       return;
     }
 
-    // Start interval
+    // Start interval with current speed
+    const currentSpeed = SPEED_LEVELS[speedLevelRef.current].interval;
     intervalRef.current = setInterval(() => {
       const nums = generateRandomNumbers();
       setNumbers(nums);
@@ -89,8 +98,45 @@ export default function GeneratorPage() {
         setAutoMode('none');
         autoModeRef.current = 'none';
       }
-    }, 100); // 0.1초마다 (빠른 시뮬레이션)
+    }, currentSpeed);
   }, [draws]);
+
+  const changeSpeed = useCallback((newLevel: 1 | 2 | 3) => {
+    setSpeedLevel(newLevel);
+    speedLevelRef.current = newLevel;
+
+    // If auto mode is running, restart with new speed
+    if (autoMode !== 'none' && intervalRef.current) {
+      clearInterval(intervalRef.current);
+
+      const newInterval = SPEED_LEVELS[newLevel].interval;
+      intervalRef.current = setInterval(() => {
+        const nums = generateRandomNumbers();
+        setNumbers(nums);
+        setHistory((prev) => [nums, ...prev.slice(0, 9)]);
+        setAttemptCount((prev) => prev + 1);
+
+        const perf = checkHistoricalPerformance(nums, draws);
+        const currentMode = autoModeRef.current;
+
+        if (currentMode === '1st' && perf.firstPlace > 0) {
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+          }
+          setAutoMode('none');
+          autoModeRef.current = 'none';
+        } else if (currentMode === '2nd' && (perf.firstPlace > 0 || perf.secondPlace > 0)) {
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+          }
+          setAutoMode('none');
+          autoModeRef.current = 'none';
+        }
+      }, newInterval);
+    }
+  }, [autoMode, draws]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -129,6 +175,24 @@ export default function GeneratorPage() {
           >
             🎲 번호 생성하기
           </button>
+
+          {/* Speed Control */}
+          <div className="flex justify-center items-center gap-2 mb-6">
+            <span className="text-sm text-gray-600 font-medium">속도:</span>
+            {([1, 2, 3] as const).map((level) => (
+              <button
+                key={level}
+                onClick={() => changeSpeed(level)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  speedLevel === level
+                    ? 'bg-indigo-500 text-white shadow-md'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {SPEED_LEVELS[level].emoji} {SPEED_LEVELS[level].label}
+              </button>
+            ))}
+          </div>
 
           {/* Auto Generate Buttons */}
           <div className="flex flex-wrap justify-center gap-3 mb-10">
