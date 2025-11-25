@@ -55,3 +55,9 @@ jobs:
           git add public/sitemap.xml
           git commit -m "chore: update sitemap $(date +'%Y-%m-%d')" || true
           git push || true
+
+      - name: Trigger deploy workflow
+        if: steps.git-check.outputs.changed == 'true'
+        run: gh workflow run "Build and Deploy" --ref main
+        env:
+          GH_TOKEN: ${{ github.token }}
