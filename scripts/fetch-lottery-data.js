@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 
 const API_URL = 'https://www.dhlottery.co.kr/common.do?method=getLottoNumber&drwNo=';
+const OUTPUT_PATH = path.join(__dirname, '..', 'public', 'data', 'lottery-history.json');
 
 async function fetchDraw(round) {
   return new Promise((resolve, reject) => {
@@ -41,22 +42,41 @@ async function fetchDraw(round) {
   });
 }
 
+function loadExistingData() {
+  try {
+    if (fs.existsSync(OUTPUT_PATH)) {
+      const data = JSON.parse(fs.readFileSync(OUTPUT_PATH, 'utf-8'));
+      return data;
+    }
+  } catch (err) {
+    console.log('Could not load existing data, starting fresh.');
+  }
+  return [];
+}
+
 async function fetchAllData() {
   console.log('Fetching lottery data from 동행복권...');
 
-  const draws = [];
-  let round = 1;
+  // Load existing data
+  const existingDraws = loadExistingData();
+  const latestRound = existingDraws.length > 0 ? existingDraws[0].round : 0;
+
+  if (latestRound > 0) {
+    console.log(`Existing data: ${existingDraws.length} draws (latest: round ${latestRound})`);
+  }
+
+  // Fetch new draws only
+  const newDraws = [];
+  let round = latestRound + 1;
   let consecutive_failures = 0;
 
   while (consecutive_failures < 3) {
     try {
       const draw = await fetchDraw(round);
       if (draw) {
-        draws.push(draw);
+        newDraws.push(draw);
         consecutive_failures = 0;
-        if (round % 100 === 0) {
-          console.log(`Fetched round ${round}...`);
-        }
+        console.log(`Fetched new round ${round}: ${draw.date}`);
       } else {
         consecutive_failures++;
       }
@@ -70,15 +90,21 @@ async function fetchAllData() {
     }
   }
 
-  // Sort by round descending (latest first)
-  draws.sort((a, b) => b.round - a.round);
+  if (newDraws.length === 0) {
+    console.log('\nNo new draws found. Data is up to date!');
+    console.log(`Latest draw: Round ${latestRound}`);
+    return;
+  }
 
-  const outputPath = path.join(__dirname, '..', 'public', 'data', 'lottery-history.json');
-  fs.writeFileSync(outputPath, JSON.stringify(draws, null, 2));
+  // Merge new draws with existing (new draws first, then existing)
+  const allDraws = [...newDraws.sort((a, b) => b.round - a.round), ...existingDraws];
 
-  console.log(`\nSuccess! Fetched ${draws.length} draws.`);
-  console.log(`Latest draw: Round ${draws[0].round} on ${draws[0].date}`);
-  console.log(`Data saved to: ${outputPath}`);
+  fs.writeFileSync(OUTPUT_PATH, JSON.stringify(allDraws, null, 2));
+
+  console.log(`\nSuccess! Fetched ${newDraws.length} new draw(s).`);
+  console.log(`Total draws: ${allDraws.length}`);
+  console.log(`Latest draw: Round ${allDraws[0].round} on ${allDraws[0].date}`);
+  console.log(`Data saved to: ${OUTPUT_PATH}`);
 }
 
 fetchAllData().catch(console.error);
