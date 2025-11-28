@@ -21,10 +21,10 @@ export default function HomePage() {
           로또 6/45 통계 분석
         </h1>
         <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-          교육적이고 정직한 로또 통계 사이트입니다.
+          1회차부터 최신 회차까지 <span className="text-emerald-600 font-semibold">{draws.length}회</span> 전체 당첨번호 통계
           <br />
-          <span className="text-emerald-600 font-semibold">
-            모든 통계는 오락 및 교육 목적으로만 제공되며, 당첨 확률을 높이지 않습니다.
+          <span className="text-gray-500">
+            번호별 출현 빈도, 최근 50회 통계, 무료 번호 생성기
           </span>
         </p>
       </div>
@@ -129,8 +129,8 @@ export default function HomePage() {
           className="link-card bg-gradient-to-br from-blue-500 to-cyan-500 text-white rounded-2xl p-8 text-center shadow-lg"
         >
           <div className="text-4xl mb-3">📊</div>
-          <div className="font-bold text-xl mb-2">통계 분석</div>
-          <div className="text-sm opacity-90">과거 데이터 시각화</div>
+          <div className="font-bold text-xl mb-2">번호 통계</div>
+          <div className="text-sm opacity-90">최근 50회 · 전체 분석</div>
         </Link>
 
         <Link

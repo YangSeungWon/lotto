@@ -21,13 +21,13 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "로또 6/45 통계 분석 | 당첨번호 조회 및 확률 교육",
-  description: "로또 당첨번호 조회, 통계 분석, 확률 교육. 모든 번호 조합은 동일한 확률(8,145,060분의 1)을 가집니다. 교육 및 오락 목적으로만 제공됩니다.",
-  keywords: "로또, 당첨번호, 통계, 확률, 번호생성기, 로또6/45, 동행복권",
+  title: "로또 6/45 최근 50회 통계 | 당첨번호 조회 · 번호 생성기",
+  description: "로또 6/45 최근 50회차 번호 통계, 역대 당첨번호 조회, 무료 번호 생성기. 1회차부터 최신 회차까지 전체 데이터 분석. 번호별 출현 빈도, 홀짝 비율, 구간별 통계를 한눈에 확인하세요.",
+  keywords: "로또, 로또 6/45, 최근 50회 통계, 당첨번호 조회, 번호 생성기, 로또 통계, 동행복권, 로또 번호 분석",
   metadataBase: new URL("https://lotto.ysw.kr"),
   openGraph: {
-    title: "로또 6/45 통계 분석",
-    description: "교육적이고 정직한 로또 통계 사이트",
+    title: "로또 6/45 최근 50회 통계 | 당첨번호 조회",
+    description: "로또 최근 50회차 번호 통계, 역대 당첨번호 조회, 무료 번호 생성기. 번호별 출현 빈도와 통계를 확인하세요.",
     type: "website",
     url: "https://lotto.ysw.kr",
   },
