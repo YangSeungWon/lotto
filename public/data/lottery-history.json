@@ -1,5 +1,20 @@
 [
   {
+    "round": 1203,
+    "date": "2025-12-20",
+    "numbers": [
+      3,
+      6,
+      18,
+      29,
+      35,
+      39
+    ],
+    "bonusNumber": 24,
+    "firstPrizeAmount": 1368060733,
+    "firstPrizeWinners": 21
+  },
+  {
     "round": 1202,
     "date": "2025-12-13",
     "numbers": [
