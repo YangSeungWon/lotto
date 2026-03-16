@@ -4,107 +4,137 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 
-const API_URL = 'https://www.dhlottery.co.kr/common.do?method=getLottoNumber&drwNo=';
+const API_URL = 'https://www.dhlottery.co.kr/lt645/selectPstLt645InfoNew.do';
 const OUTPUT_PATH = path.join(__dirname, '..', 'public', 'data', 'lottery-history.json');
 
-async function fetchDraw(round) {
+function fetchBatch(cursor) {
+  const url = `${API_URL}?srchDir=older&srchCursorLtEpsd=${cursor}&_=${Date.now()}`;
   return new Promise((resolve, reject) => {
-    https.get(API_URL + round, (res) => {
+    const req = https.get(url, { timeout: 15000 }, (res) => {
       let data = '';
       res.on('data', (chunk) => (data += chunk));
       res.on('end', () => {
         try {
           const json = JSON.parse(data);
-          if (json.returnValue === 'success') {
-            resolve({
-              round: json.drwNo,
-              date: json.drwNoDate,
-              numbers: [
-                json.drwtNo1,
-                json.drwtNo2,
-                json.drwtNo3,
-                json.drwtNo4,
-                json.drwtNo5,
-                json.drwtNo6,
-              ].sort((a, b) => a - b),
-              bonusNumber: json.bnusNo,
-              firstPrizeAmount: json.firstWinamnt,
-              firstPrizeWinners: json.firstPrzwnerCo,
-            });
-          } else {
-            resolve(null);
-          }
-        } catch (err) {
-          reject(err);
+          const list = json.data?.list || [];
+          resolve(list.map(parseDraw));
+        } catch {
+          resolve([]);
         }
       });
-    }).on('error', reject);
+    });
+    req.on('error', () => resolve([]));
+    req.on('timeout', () => { req.destroy(); resolve([]); });
   });
+}
+
+function parseDraw(d) {
+  const s = String(d.ltRflYmd);
+  return {
+    round: d.ltEpsd,
+    date: `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`,
+    numbers: [d.tm1WnNo, d.tm2WnNo, d.tm3WnNo, d.tm4WnNo, d.tm5WnNo, d.tm6WnNo].sort((a, b) => a - b),
+    bonusNumber: d.bnsWnNo,
+    firstPrizeAmount: d.rnk1WnAmt,
+    firstPrizeWinners: d.rnk1WnNope,
+  };
 }
 
 function loadExistingData() {
   try {
     if (fs.existsSync(OUTPUT_PATH)) {
-      const data = JSON.parse(fs.readFileSync(OUTPUT_PATH, 'utf-8'));
-      return data;
+      return JSON.parse(fs.readFileSync(OUTPUT_PATH, 'utf-8'));
     }
-  } catch (err) {
+  } catch {
     console.log('Could not load existing data, starting fresh.');
   }
   return [];
 }
 
+// Calculate how many Saturdays (draws) between last data date and today
+function estimateMissingRounds(latestDate) {
+  const last = new Date(latestDate);
+  const now = new Date();
+  const diffMs = now - last;
+  return Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000));
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 async function fetchAllData() {
   console.log('Fetching lottery data from 동행복권...');
 
-  // Load existing data
   const existingDraws = loadExistingData();
+  const existingRounds = new Set(existingDraws.map((d) => d.round));
   const latestRound = existingDraws.length > 0 ? existingDraws[0].round : 0;
+  const latestDate = existingDraws.length > 0 ? existingDraws[0].date : null;
 
   if (latestRound > 0) {
-    console.log(`Existing data: ${existingDraws.length} draws (latest: round ${latestRound})`);
+    console.log(`Existing data: ${existingDraws.length} draws (latest: round ${latestRound}, ${latestDate})`);
   }
 
-  // Fetch new draws only
   const newDraws = [];
-  let round = latestRound + 1;
-  let consecutive_failures = 0;
 
-  while (consecutive_failures < 3) {
-    try {
-      const draw = await fetchDraw(round);
-      if (draw) {
-        newDraws.push(draw);
-        consecutive_failures = 0;
-        console.log(`Fetched new round ${round}: ${draw.date}`);
-      } else {
-        consecutive_failures++;
-      }
-      round++;
-      // Small delay to be respectful to the API
-      await new Promise(resolve => setTimeout(resolve, 50));
-    } catch (err) {
-      console.error(`Error fetching round ${round}:`, err.message);
-      consecutive_failures++;
-      round++;
+  // Calculate cursor: only request what we actually need
+  let cursor;
+  if (latestRound > 0 && latestDate) {
+    const missing = estimateMissingRounds(latestDate);
+    cursor = latestRound + missing;
+    console.log(`Estimated ${missing} missing round(s), fetching from cursor ${cursor}`);
+  } else {
+    // Fresh install: start high and page backwards
+    cursor = 9999;
+  }
+
+  while (true) {
+    const batch = await fetchBatch(cursor);
+
+    if (batch.length === 0) {
+      if (latestRound > 0) break;
+      // Fresh install: probe downward
+      cursor -= 10;
+      if (cursor <= 0) break;
+      await sleep(2000);
+      continue;
     }
+
+    let reachedExisting = false;
+    for (const draw of batch) {
+      if (existingRounds.has(draw.round)) {
+        reachedExisting = true;
+        continue;
+      }
+      newDraws.push(draw);
+      console.log(`Fetched round ${draw.round}: ${draw.date}`);
+    }
+
+    if (reachedExisting) break;
+
+    const minRound = Math.min(...batch.map((d) => d.round));
+    if (minRound <= 1) break;
+    cursor = minRound;
+
+    await sleep(2000);
   }
 
   if (newDraws.length === 0) {
     console.log('\nNo new draws found. Data is up to date!');
-    console.log(`Latest draw: Round ${latestRound}`);
     return;
   }
 
-  // Merge new draws with existing (new draws first, then existing)
-  const allDraws = [...newDraws.sort((a, b) => b.round - a.round), ...existingDraws];
+  const allDraws = [...newDraws, ...existingDraws].sort((a, b) => b.round - a.round);
+  const seen = new Set();
+  const deduped = allDraws.filter((d) => {
+    if (seen.has(d.round)) return false;
+    seen.add(d.round);
+    return true;
+  });
 
-  fs.writeFileSync(OUTPUT_PATH, JSON.stringify(allDraws, null, 2));
+  fs.writeFileSync(OUTPUT_PATH, JSON.stringify(deduped, null, 2));
 
   console.log(`\nSuccess! Fetched ${newDraws.length} new draw(s).`);
-  console.log(`Total draws: ${allDraws.length}`);
-  console.log(`Latest draw: Round ${allDraws[0].round} on ${allDraws[0].date}`);
-  console.log(`Data saved to: ${OUTPUT_PATH}`);
+  console.log(`Total draws: ${deduped.length}`);
+  console.log(`Latest draw: Round ${deduped[0].round} on ${deduped[0].date}`);
 }
 
 fetchAllData().catch(console.error);
