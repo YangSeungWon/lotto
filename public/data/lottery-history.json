@@ -1,5 +1,20 @@
 [
   {
+    "round": 1243,
+    "date": "2026-09-26",
+    "numbers": [
+      9,
+      18,
+      24,
+      38,
+      43,
+      44
+    ],
+    "bonusNumber": 35,
+    "firstPrizeAmount": 2592525282,
+    "firstPrizeWinners": 12
+  },
+  {
     "round": 1242,
     "date": "2026-09-19",
     "numbers": [
